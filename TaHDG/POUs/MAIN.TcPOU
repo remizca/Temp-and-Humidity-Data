@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="MAIN" Id="{5fc2b497-9873-4a15-8d72-5db715795b48}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+    fbSerialLine     : SerialLineControlADS;
+    serialCfg        : ComSerialConfig;
+    txBuffer         : ComBuffer;
+    rxBuffer         : ComBuffer;
+
+    fbReceiveTemp    : ReceiveString255;
+    fbReceiveHum     : ReceiveString255;
+    fbSend           : SendString255;
+
+    sReceivedTemp    : STRING(255);
+    sReceivedHum     : STRING(255);
+    bTempReceived    : BOOL;
+    bHumReceived     : BOOL;
+
+    rTemperature     : REAL;
+    rHumidity        : REAL;
+
+    bRequestHumidity : BOOL;
+    bRequestSent     : BOOL;
+    bInitDone        : BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// -------------------------------------------------------
+// Step 1: Configure COM7 once
+// -------------------------------------------------------
+IF NOT bInitDone THEN
+    serialCfg.ComPort  := 7;
+    serialCfg.BaudRate := 9600;
+    serialCfg.DataBits := 8;
+    serialCfg.StopBits := 1;
+    serialCfg.Parity   := 0;
+    bInitDone := TRUE;
+END_IF
+
+// Run every cycle
+fbSerialLine(
+    Connect   := TRUE,
+    SerialCfg := serialCfg,
+    NetId     := '',
+    TxBuffer  := txBuffer,
+    RxBuffer  := rxBuffer
+);
+
+// -------------------------------------------------------
+// Step 2: Receive temperature
+// -------------------------------------------------------
+fbReceiveTemp(
+    Prefix         := 'TEMP:',
+    Suffix         := '$N',
+    Timeout        := T#2S,
+    Reset          := FALSE,
+    RXbuffer       := rxBuffer,
+    ReceivedString := sReceivedTemp,
+    StringReceived => bTempReceived
+);
+
+IF bTempReceived THEN
+    rTemperature := STRING_TO_REAL(sReceivedTemp);
+END_IF
+
+// -------------------------------------------------------
+// Step 3: Receive humidity response
+// -------------------------------------------------------
+fbReceiveHum(
+    Prefix         := 'HUM:',
+    Suffix         := '$N',
+    Timeout        := T#2S,
+    Reset          := FALSE,
+    RXbuffer       := rxBuffer,
+    ReceivedString := sReceivedHum,
+    StringReceived => bHumReceived
+);
+
+IF bHumReceived THEN
+    rHumidity := STRING_TO_REAL(sReceivedHum);
+END_IF
+
+// -------------------------------------------------------
+// Step 4: Send GET_HUM on button press
+// -------------------------------------------------------
+IF bRequestHumidity AND NOT bRequestSent THEN
+    fbSend(
+        SendString := 'GET_HUM$N',
+        TXbuffer   := txBuffer
+    );
+    bRequestSent     := TRUE;
+    bRequestHumidity := FALSE;
+END_IF
+
+IF NOT fbSend.Busy THEN
+    bRequestSent := FALSE;
+END_IF]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
