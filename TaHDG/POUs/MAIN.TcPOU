@@ -27,7 +27,7 @@ END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[// -------------------------------------------------------
-// Step 1: Configure COM7 once
+// Step 1: Configure COM7 once.
 // -------------------------------------------------------
 IF NOT bInitDone THEN
     serialCfg.ComPort  := 7;
